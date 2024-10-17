@@ -7,7 +7,7 @@ Summary:        Framework to lay out and implement elegant Swing panels in Java
 
 Group:          Development/Java
 License:        BSD
-URL:            http://www.jgoodies.com/freeware/forms/
+URL:            https://www.jgoodies.com/freeware/forms/
 Source0:        http://www.jgoodies.com/download/libraries/%{shortname}/%{name}-%(tr "." "_" <<<%{version}).zip
 
 # Fontconfig and DejaVu fonts needed for tests
