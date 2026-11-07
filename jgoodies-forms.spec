@@ -1,156 +1,136 @@
-%define shortname forms
+Name:		jgoodies-forms
+Version:	1.9.0
+Release:	1
+Summary:	Framework to lay out and implement elegant Swing panels
+Group:		Development/Java
+License:	BSD
+URL:		https://www.jgoodies.com/
+# Upstream no longer publishes the vendor zip. This is the last open-source
+# release, and the Maven Central sources jar is the source of record.
+Source0:	https://repo1.maven.org/maven2/com/jgoodies/jgoodies-forms/1.9.0/jgoodies-forms-1.9.0-sources.jar#/jgoodies-forms-%{version}-sources.zip
 
-Name:           jgoodies-forms
-Version:        1.8.0
-Release:        3%{?dist}
-Summary:        Framework to lay out and implement elegant Swing panels in Java
+BuildArch:	noarch
+BuildRequires:	python
+# Literal, so the first rpmbuild -bs records them before sysjar is installed.
+BuildRequires:	maven
+BuildRequires:	java-current-devel
+BuildRequires:	mvn(com.jgoodies:jgoodies-common)
+BuildSystem:	maven
+BuildOption(install):	--file-name jgoodies-forms
 
-Group:          Development/Java
-License:        BSD
-URL:            https://www.jgoodies.com/freeware/forms/
-Source0:        http://www.jgoodies.com/download/libraries/%{shortname}/%{name}-%(tr "." "_" <<<%{version}).zip
-
-# Fontconfig and DejaVu fonts needed for tests
-BuildRequires:  fonts-ttf-dejavu
-BuildRequires:  fontconfig
-BuildRequires:  java-devel >= 1:1.6.0
-BuildRequires:  jgoodies-common >= 1.8.0
-BuildRequires:  jpackage-utils
-BuildRequires:  maven-local
-BuildRequires:  maven-clean-plugin
-Requires:       java >= 1:1.6.0
-Requires:       jgoodies-common >= 1.8.0
-Requires:       jpackage-utils
-BuildArch:      noarch
+Obsoletes:	%{name}-javadoc < %{version}-%{release}
 
 %description
-The JGoodies Forms framework helps you lay out and implement elegant Swing
-panels quickly and consistently. It makes simple things easy and the hard stuff
-possible, the good design easy and the bad difficult.
-
-
-%package javadoc
-Summary:        Javadoc for %{name}
-Group:          Documentation
-Requires:       jpackage-utils
-
-%description javadoc
-This package contains the API documentation for %{name}.
-
+JGoodies Forms lays out Swing panels on a grid of columns and rows.
+1.9.0 is binary incompatible with 1.8.0: it adds the previously
+closed-source FormBuilder, adds Padding and Paddings, and deprecates
+PanelBuilder, I15dPanelBuilder, and DefaultFormBuilder.
+The build uses the system jgoodies-common 1.8.1 jar.
+The compiler source level is 1.8. Tests are skipped.
 
 %prep
-%setup -q
+%autosetup -c -n jgoodies-forms-%{version}
+python - <<'PY'
+import shutil
+from pathlib import Path
 
-# Unzip source and test files from provided JARs
-mkdir -p src/main/java/ src/test/java/
-pushd src/main/java/
-jar -xf ../../../%{name}-%{version}-sources.jar
-popd
-pushd src/test/java/
-jar -xf ../../../%{name}-%{version}-tests.jar
-popd
+src = Path("src/main/java")
+src.mkdir(parents=True)
+shutil.move("com", src / "com")
+meta = Path("META-INF")
+if meta.exists():
+    shutil.rmtree(meta)
 
-# Delete prebuild JARs
-find -name "*.jar" -exec rm {} \;
+java_files = list(src.rglob("*.java"))
+if len(java_files) != 43:
+    raise SystemExit("java files " + str(len(java_files)))
+if list(Path(".").rglob("*.jar")):
+    raise SystemExit("prebuilt jar remains")
 
-# Drop tests that require a running X11 server
-rm src/test/java/com/jgoodies/forms/layout/SerializationTest.java
-sed -i "/SerializationTest.class,/d" src/test/java/com/jgoodies/forms/layout/AllFormsTests.java
+header = Path("src/main/java/com/jgoodies/forms/layout/FormLayout.java").read_text(encoding="utf-8")
+start = header.index("/*")
+end = header.index("*/")
+lines = []
+for line in header[start + 2:end].splitlines():
+    if line.startswith(" *"):
+        line = line[2:]
+        if line.startswith(" "):
+            line = line[1:]
+    lines.append(line.rstrip())
+Path("LICENSE.txt").write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+license_text = Path("LICENSE.txt").read_text(encoding="utf-8")
+if "JGoodies Software GmbH" not in license_text or "AS IS" not in license_text:
+    raise SystemExit("license text was not extracted")
 
-# Delete ClassLoader test
-# TODO: fix it to make it work
-rm src/test/java/com/jgoodies/forms/layout/ClassLoaderTest.java
-sed -i "/ClassLoaderTest.class,/d" src/test/java/com/jgoodies/forms/layout/AllFormsTests.java
+Path("pom.xml").write_text("""<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.jgoodies</groupId>
+  <artifactId>jgoodies-forms</artifactId>
+  <version>%{version}</version>
+  <packaging>jar</packaging>
+  <name>JGoodies Forms</name>
+  <description>Swing form layout built against the system jgoodies-common jar.</description>
+  <url>https://www.jgoodies.com/</url>
+  <licenses>
+    <license>
+      <name>BSD</name>
+      <url>https://www.jgoodies.com/</url>
+    </license>
+  </licenses>
+  <dependencies>
+    <dependency>
+      <groupId>com.jgoodies</groupId>
+      <artifactId>jgoodies-common</artifactId>
+      <version>1.8.1</version>
+    </dependency>
+  </dependencies>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+  </properties>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.12.1</version>
+        <configuration>
+          <source>1.8</source>
+          <target>1.8</target>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.3.0</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+""", encoding="utf-8")
+pom = Path("pom.xml").read_text(encoding="utf-8")
+for needle in (
+    "<artifactId>jgoodies-forms</artifactId>",
+    "<artifactId>jgoodies-common</artifactId>",
+    "<version>1.8.1</version>",
+    "<version>%{version}</version>",
+    "<source>1.8</source>",
+    "<target>1.8</target>",
+):
+    if needle not in pom:
+        raise SystemExit("pom missing " + needle)
+for needle in ("junit", "oss-parent", "<source>1.6</source>", "SNAPSHOT", "<release>"):
+    if needle in pom:
+        raise SystemExit("pom still contains " + needle)
+PY
 
-# Fix wrong end-of-line encoding
-for file in LICENSE.txt RELEASE-NOTES.txt; do
-  sed -i.orig "s/\r//" $file && \
-  touch -r $file.orig $file && \
-  rm $file.orig
-done
-
-%mvn_file :%{name} %{name} %{name}
-
-
-%build
-%mvn_build
-
-
-%install
-%mvn_install
-
+%build -a
+java --module-path target/jgoodies-forms-%{version}.jar --describe-module jgoodies.forms > module-describe.txt
+# A versioned jar prints "name@version ... automatic", not "name automatic".
+grep -q '^jgoodies.forms' module-describe.txt || { cat module-describe.txt; exit 1; }
+grep -q ' automatic$' module-describe.txt || { cat module-describe.txt; exit 1; }
 
 %files -f .mfiles
-%doc LICENSE.txt README.html RELEASE-NOTES.txt
-
-
-%files javadoc -f .mfiles-javadoc
-
-
-%changelog
-* Thu Feb 04 2016 Fedora Release Engineering <releng@fedoraproject.org> - 1.8.0-3
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_24_Mass_Rebuild
-
-* Wed Jun 17 2015 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.8.0-2
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_23_Mass_Rebuild
-
-* Fri Jun 13 2014 Mohamed El Morabity <melmorabity@fedoraproject.org> - 1.8.0-1
-- Update to 1.8.0
-
-* Sun Jun 08 2014 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.7.2-2
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_21_Mass_Rebuild
-
-* Wed Feb 12 2014 Mohamed El Morabity <melmorabity@fedoraproject.org> - 1.7.2-1
-- Update to 1.7.2
-
-* Fri Aug 16 2013 Mohamed El Morabity <melmorabity@fedoraproject.org> - 1.7.1-3
-- Update for newer guidelines
-
-* Sat Aug 03 2013 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.7.1-2
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_20_Mass_Rebuild
-
-* Sat May 11 2013 Mohamed El Morabity <melmorabity@fedoraproject.org> - 1.7.1-1
-- Update to 1.7.1
-
-* Wed Feb 06 2013 Java SIG <java-devel@lists.fedoraproject.org> - 1.6.0-2
-- Update for https://fedoraproject.org/wiki/Fedora_19_Maven_Rebuild
-- Replace maven BuildRequires with maven-local
-
-* Wed Jan 02 2013 Mohamed El Morabity <melmorabity@fedoraproject.org> - 1.6.0-1
-- Update to 1.6.0
-
-* Thu Jul 19 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.5.1-2
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_18_Mass_Rebuild
-
-* Thu May 10 2012 Mohamed El Morabity <melmorabity@fedoraproject.org> - 1.5.1-1
-- Update to 1.5.1
-
-* Wed Feb 15 2012 Mohamed El Morabity <melmorabity@fedoraproject.org> - 1.5.0-1
-- Update to 1.5.0
-
-* Fri Jan 13 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.4.2-2
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_17_Mass_Rebuild
-
-* Fri Dec 16 2011 Mohamed El Morabity <melmorabity@fedoraproject.org> - 1.4.2-1
-- Update to 1.4.2
-- Spec cleanup
-
-* Wed Feb 09 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.2.0-4
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_15_Mass_Rebuild
-
-* Fri Jul 24 2009 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.2.0-3
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_12_Mass_Rebuild
-
-* Wed Feb 25 2009 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.2.0-2
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_11_Mass_Rebuild
-
-* Mon May 19 2008 Mary Ellen Foster <mefoster at gmail.com> 1.2.0-1
-- Update to 1.2.0
-
-* Tue Oct 16 2007 Mary Ellen Foster <mefoster at gmail.com> 1.1.0-2
-- Fix encoding on HTML files
-- Use empty CLASSPATH when building
-- Fix indentation in spec file
-
-* Wed Sep  5 2007 Mary Ellen Foster <mefoster at gmail.com> 1.1.0-1
-- Initial version for Fedora, based on JPackage spec by Eric Lavarde
+%doc LICENSE.txt overview.html

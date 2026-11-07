@@ -1,2 +1,4 @@
-sources:
+removed_sources:
   jgoodies-forms-1_8_0.zip: 025dd4527b949cd62d815f6f04eb0554dc710197
+sources:
+  jgoodies-forms-1.9.0-sources.zip: 2e8e3ff4fe65dc5a2b4fa6bfb2522e69ac644fc5
